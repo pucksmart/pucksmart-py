@@ -6,12 +6,14 @@ dependencies = [
     "djangorestframework",
     "django-celery-results",
     "celery",
+    "celery[redis]",
     "markdown",
     "requests",
     "numpy",
     "pandas",
     "matplotlib",
     "seaborn",
+    "boto3",
 ]
 
 [tool.setuptools]

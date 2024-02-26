@@ -3,6 +3,18 @@ from datetime import date
 from celery import shared_task
 
 import nhlapi.schedule
+import nhlapi.league
+from stats.models import Franchise
+
+
+@shared_task
+def load_franchises():
+    franchises = nhlapi.league.get_franchises()
+    for f in franchises['data']:
+        franchise = Franchise()
+        franchise.id = f['id']
+    print(franchises)
+    return franchises
 
 
 @shared_task
