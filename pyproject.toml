@@ -1,0 +1,23 @@
+[project]
+name = "pucksmart"
+version = "trunk"
+dependencies = [
+    "django==5.0.*",
+    "django-celery-results",
+    "celery",
+    "markdown",
+    "requests",
+    "numpy",
+    "pandas",
+    "matplotlib",
+    "seaborn",
+]
+
+[project.optional-dependencies]
+dev = [
+  "black",
+  "isort",
+]
+
+[tool.isort]
+profile = "black"
