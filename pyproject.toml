@@ -3,6 +3,7 @@ name = "pucksmart"
 version = "0.1"
 dependencies = [
     "django==5.0.*",
+    "djangorestframework",
     "django-celery-results",
     "celery",
     "markdown",

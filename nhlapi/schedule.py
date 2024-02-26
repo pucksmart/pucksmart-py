@@ -5,10 +5,7 @@ from datetime import date, datetime
 import requests
 
 
-def get_week_schedule(start_day: date = None):
-    if start_day is None:
-        start_day = date.today()
-
+def get_week_schedule(start_day: date = date.today()):
     resp = requests.get("https://api-web.nhle.com/v1/schedule/" + start_day.isoformat())
 
     return resp.json()
