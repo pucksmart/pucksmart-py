@@ -1,16 +1,27 @@
 [project]
 name = "pucksmart"
-version = "trunk"
+version = "0.1"
 dependencies = [
     "django==5.0.*",
+    "djangorestframework",
     "django-celery-results",
     "celery",
+    "celery[redis]",
     "markdown",
     "requests",
     "numpy",
     "pandas",
     "matplotlib",
     "seaborn",
+    "boto3",
+]
+
+[tool.setuptools]
+packages = [
+    "charts",
+    "nhlapi",
+    "pucksmart",
+    "stats",
 ]
 
 [project.optional-dependencies]
