@@ -1,10 +1,15 @@
-from datetime import date
+import zoneinfo
+from datetime import date, datetime, timezone
 
 from celery import shared_task
 
 import nhlapi.schedule
 import nhlapi.league
-from stats.models import Franchise, Team
+from stats.models import Franchise, Team, Season
+
+
+def eastern_datetime(value: str) -> datetime:
+    return datetime(value, tzinfo=zoneinfo.ZoneInfo('America/New_York')).astimezone(tz=timezone.utc)
 
 
 @shared_task
@@ -38,6 +43,24 @@ def load_teams():
     Team.objects.bulk_create(teams, ignore_conflicts=True)
 
     print(teams)
+
+
+@shared_task
+def load_seasons():
+    seasons_resp = nhlapi.league.get_seasons()
+    seasons = []
+    for s in seasons_resp['data']:
+        season = Season()
+        season.id = s['id']
+        season.formatted_season_id = s['formattedSeasonId']
+        season.start_date = eastern_datetime(s['startDate'])
+        season.end_date = eastern_datetime(s['endDate'])
+        season.preseason_start_date = eastern_datetime(s['preseasonStartdate'])
+        season.regular_season_end_date = eastern_datetime(s['regularSeasonEndDate'])
+        seasons.append(season)
+    Season.objects.bulk_create(seasons, ignore_conflicts=True)
+
+    print(seasons)
 
 
 @shared_task

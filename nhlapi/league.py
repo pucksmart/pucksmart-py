@@ -13,3 +13,9 @@ def get_teams():
     resp = requests.get("https://api.nhle.com/stats/rest/en/team")
 
     return resp.json()
+
+
+def get_seasons():
+    resp = requests.get("https://api.nhle.com/stats/rest/en/season")
+
+    return resp.json()

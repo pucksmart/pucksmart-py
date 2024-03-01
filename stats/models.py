@@ -17,6 +17,15 @@ class Team(models.Model):
     franchise = models.ForeignKey(Franchise, on_delete=models.DO_NOTHING)
 
 
+class Season(models.Model):
+    id = models.IntegerField(primary_key=True)
+    formatted_season_id = models.CharField(max_length=7)
+    start_date = models.DateTimeField()
+    end_date = models.DateTimeField()
+    preseason_start_date = models.DateTimeField(null=True, blank=True)
+    regular_season_end_date = models.DateTimeField()
+
+
 class Game(models.Model):
     id = models.IntegerField(primary_key=True)
     start_time = models.DateTimeField()
