@@ -18,10 +18,9 @@ def load_franchises():
         franchise.common_name = f['teamCommonName']
         franchise.place_name = f['teamPlaceName']
         franchises.append(franchise)
-    Franchise.objects.bulk_create(franchises)
+    Franchise.objects.bulk_create(franchises, ignore_conflicts=True)
 
     print(franchises)
-    return franchises
 
 
 @shared_task
@@ -39,7 +38,7 @@ def load_teams():
     Team.objects.bulk_create(teams, ignore_conflicts=True)
 
     print(teams)
-    return teams
+
 
 @shared_task
 def scan_games_today():
