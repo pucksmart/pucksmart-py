@@ -5,7 +5,7 @@ from celery import shared_task
 
 import nhlapi.league
 import nhlapi.schedule
-from stats.models import Franchise, Season, Team
+from stats.models import Franchise, Season, Team, Game
 
 
 def _eastern_iso_to_utc(value: str) -> datetime | None:
@@ -69,15 +69,22 @@ def load_seasons():
 
 
 @shared_task
-def scan_games_today():
-    schedule = nhlapi.schedule.get_week_schedule(date.today())
-    print(schedule)
-    return schedule
+def load_weeks_games(day: date):
+    schedule = nhlapi.schedule.get_week_schedule(day)
+    games = []
+    for d in schedule["gameWeek"]:
+        for g in d["games"]:
+            game = Game()
+            game.id = g["id"]
+            game.season = Season.objects.get(id=g["season"])
+            game.game_type = g["gameType"]
+            game.start_time = g["startTimeUTC"]
+            game.away_team = Team.objects.get(id=g["awayTeam"]["id"])
+            game.home_team = Team.objects.get(id=g["homeTeam"]["id"])
+            games.append(game)
+    Game.objects.bulk_create(games, ignore_conflicts=True)
 
-
-@shared_task
-def back_fill_games(x, y):
-    return x * y
+    print(games)
 
 
 @shared_task

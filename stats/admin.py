@@ -1,6 +1,7 @@
 from django.contrib import admin
 
-from stats.models import Franchise, Team
+from stats.models import Franchise, Team, Game
+
 
 # Register your models here.
 
@@ -15,3 +16,9 @@ class FranchiseAdmin(admin.ModelAdmin):
 class TeamAdmin(admin.ModelAdmin):
     list_display = ["id", "name", "abbreviation"]
     ordering = ["name"]
+
+
+@admin.register(Game)
+class GameAdmin(admin.ModelAdmin):
+    list_display = ["id", "season", "game_type"]
+    ordering = ["id"]

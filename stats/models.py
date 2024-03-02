@@ -28,6 +28,8 @@ class Season(models.Model):
 
 class Game(models.Model):
     id = models.IntegerField(primary_key=True)
-    start_time = models.DateTimeField()
-    season = models.CharField(max_length=8)
+    season = models.ForeignKey(Season, on_delete=models.DO_NOTHING)
     game_type = models.SmallIntegerField()
+    start_time = models.DateTimeField()
+    away_team = models.ForeignKey(Team, on_delete=models.DO_NOTHING, related_name='games_as_away_team', null=True, blank=True)
+    home_team = models.ForeignKey(Team, on_delete=models.DO_NOTHING, related_name='games_as_home_team', null=True, blank=True)
