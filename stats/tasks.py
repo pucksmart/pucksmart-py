@@ -1,7 +1,7 @@
 import zoneinfo
-from datetime import date, datetime, timezone
+from datetime import date, datetime, timezone, timedelta
 
-from celery import shared_task
+from celery import chain, group, shared_task
 
 import nhlapi.league
 import nhlapi.schedule
@@ -15,6 +15,20 @@ def _eastern_iso_to_utc(value: str) -> datetime | None:
         tzinfo=zoneinfo.ZoneInfo(key="America/New_York")
     )
     return timestamp.astimezone(timezone.utc)
+
+
+@shared_task
+def preload():
+    chain(
+        group(
+            load_seasons.apply_async(),
+            chain(
+                load_franchises.signature(args=()),
+                load_teams.signature(args=(), immutable=True),
+            ).apply_async(),
+        ),
+        load_games.apply_async()
+    )
 
 
 @shared_task
@@ -69,6 +83,26 @@ def load_seasons():
 
 
 @shared_task
+def load_games():
+    seasons = Season.objects.all()
+    season_ids = [s.id for s in seasons]
+    load_season_games.map(season_ids).apply_async()
+
+
+
+@shared_task
+def load_season_games(season_id: int):
+    season = Season.objects.get(id=season_id)
+    day = season.start_date.date()
+    days = []
+    while day < season.end_date.date():
+        days.append(day)
+        day = day + timedelta(days=7)
+
+    load_weeks_games.map(days).apply_async()
+
+
+@shared_task
 def load_weeks_games(day: date):
     schedule = nhlapi.schedule.get_week_schedule(day)
     games = []
@@ -79,14 +113,13 @@ def load_weeks_games(day: date):
             game.season = Season.objects.get(id=g["season"])
             game.game_type = g["gameType"]
             game.start_time = g["startTimeUTC"]
-            game.away_team = Team.objects.get(id=g["awayTeam"]["id"])
-            game.home_team = Team.objects.get(id=g["homeTeam"]["id"])
+            try:
+                game.away_team = Team.objects.get(id=g["awayTeam"]["id"])
+                game.home_team = Team.objects.get(id=g["homeTeam"]["id"])
+            except Team.DoesNotExist:
+                print("a team does not exist", "away", g["awayTeam"]["id"], "home", g["homeTeam"]["id"])
+                continue
             games.append(game)
     Game.objects.bulk_create(games, ignore_conflicts=True)
 
     print(games)
-
-
-@shared_task
-def xsum(numbers):
-    return sum(numbers)
