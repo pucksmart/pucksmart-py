@@ -3,6 +3,7 @@ from datetime import date, datetime, timezone, timedelta
 
 from celery import chain, group, shared_task
 
+import nhlapi.game
 import nhlapi.league
 import nhlapi.schedule
 from stats.models import Franchise, Season, Team, Game
@@ -89,7 +90,6 @@ def load_games():
     load_season_games.map(season_ids).apply_async()
 
 
-
 @shared_task
 def load_season_games(season_id: int):
     season = Season.objects.get(id=season_id)
@@ -115,11 +115,22 @@ def load_weeks_games(day: date):
             game.start_time = g["startTimeUTC"]
             try:
                 game.away_team = Team.objects.get(id=g["awayTeam"]["id"])
+            except Team.DoesNotExist:
+                print(g)
+            try:
                 game.home_team = Team.objects.get(id=g["homeTeam"]["id"])
             except Team.DoesNotExist:
-                print("a team does not exist", "away", g["awayTeam"]["id"], "home", g["homeTeam"]["id"])
-                continue
+                print(g)
             games.append(game)
     Game.objects.bulk_create(games, ignore_conflicts=True)
 
     print(games)
+
+
+@shared_task
+def load_games_play_by_play(game_id: str):
+    pbp_resp = nhlapi.game.get_game_play_by_play(game_id)
+    plays = []
+
+    for p in pbp_resp['plays']:
+        print(p)
