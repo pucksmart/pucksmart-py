@@ -6,7 +6,7 @@ from celery import chain, group, shared_task
 import nhlapi.game
 import nhlapi.league
 import nhlapi.schedule
-from stats.models import Franchise, Season, Team, Game
+from stats.models import Franchise, Season, Team, Game, Shot, Faceoff
 
 
 def _eastern_iso_to_utc(value: str) -> datetime | None:
@@ -16,6 +16,11 @@ def _eastern_iso_to_utc(value: str) -> datetime | None:
         tzinfo=zoneinfo.ZoneInfo(key="America/New_York")
     )
     return timestamp.astimezone(timezone.utc)
+
+
+def _scoreboard_time_to_seconds(scoreboard_time: str) -> int:
+    (minutes, seconds) = tuple(scoreboard_time.split(":"))
+    return int(minutes) * 60 + int(seconds)
 
 
 @shared_task
@@ -130,7 +135,35 @@ def load_weeks_games(day: date):
 @shared_task
 def load_games_play_by_play(game_id: str):
     pbp_resp = nhlapi.game.get_game_play_by_play(game_id)
-    plays = []
 
     for p in pbp_resp['plays']:
         print(p)
+        event = None
+
+        if p["typeCode"] in nhlapi.game.shot_type_mapping:
+            event = Shot()
+            if Shot.objects.filter(game_id=game_id, event_id=p["eventId"]).exists():
+                event = Shot.objects.get(game_id=game_id, event_id=p["eventId"])
+            event.result = nhlapi.game.shot_type_mapping[p["typeCode"]]
+            if event.result == "GOAL":
+                event.shooter = p["details"]["scoringPlayerId"]
+            else:
+                event.shooter = p["details"]["shootingPlayerId"]
+            if "goalieInNetId" in p["details"]:
+                event.goalie = p["details"]["goalieInNetId"]
+            if "blockingPlayerId" in p["details"]:
+                event.blocking_player = p["details"]["blockingPlayerId"]
+        elif p["typeCode"] == 502:
+            event = Faceoff()
+            if Faceoff.objects.filter(game_id=game_id, event_id=p["eventId"]).exists():
+                event = Faceoff.objects.get(game_id=game_id, event_id=p["eventId"])
+            event.winner = p["details"]["winningPlayerId"]
+            event.loser = p["details"]["losingPlayerId"]
+
+        if event:
+            event.game_id = game_id
+            event.event_id = p["eventId"]
+            event.period = p["periodDescriptor"]["number"]
+            event.time_elapsed = _scoreboard_time_to_seconds(p["timeInPeriod"])
+            event.time_remaining = _scoreboard_time_to_seconds(p["timeRemaining"])
+            event.save()

@@ -45,3 +45,33 @@ class Game(models.Model):
         null=True,
         blank=True,
     )
+
+
+class PlayByPlayEvent(models.Model):
+    game = models.ForeignKey(Game, on_delete=models.DO_NOTHING)
+    event_id = models.IntegerField()
+    period = models.SmallIntegerField()
+    time_elapsed = models.IntegerField()
+    time_remaining = models.IntegerField()
+
+    class Meta:
+        abstract = True
+        unique_together = ["game", "event_id"]
+
+
+class Shot(PlayByPlayEvent):
+    SHOT_RESULTS = [
+        ("SOG", "Shot on goal"),
+        ("BLK", "Blocked shot"),
+        ("MISS", "Missed shot"),
+        ("GOAL", "Goal"),
+    ]
+    result = models.CharField(max_length=4, choices=SHOT_RESULTS)
+    shooter = models.IntegerField()
+    goalie = models.IntegerField(null=True, blank=True)
+    blocking_player = models.IntegerField(null=True, blank=True)
+
+
+class Faceoff(PlayByPlayEvent):
+    winner = models.IntegerField()
+    loser = models.IntegerField()
