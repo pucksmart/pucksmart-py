@@ -14,7 +14,7 @@ class Team(models.Model):
     id = models.IntegerField(primary_key=True)
     name = models.CharField(max_length=64)
     abbreviation = models.CharField(max_length=3)
-    franchise = models.ForeignKey(Franchise, on_delete=models.DO_NOTHING)
+    franchise = models.ForeignKey(Franchise, on_delete=models.DO_NOTHING, null=True, blank=True)
 
 
 class Season(models.Model):
@@ -75,3 +75,17 @@ class Shot(PlayByPlayEvent):
 class Faceoff(PlayByPlayEvent):
     winner = models.IntegerField()
     loser = models.IntegerField()
+
+
+class Shift(models.Model):
+    game = models.ForeignKey(Game, on_delete=models.DO_NOTHING)
+    shift_id = models.IntegerField()
+    player_id = models.IntegerField()
+    team = models.ForeignKey(Team, on_delete=models.DO_NOTHING)
+    period = models.SmallIntegerField()
+    start_time = models.IntegerField()
+    end_time = models.IntegerField()
+    duration = models.IntegerField()
+
+    class Meta:
+        unique_together = ["game", "shift_id"]

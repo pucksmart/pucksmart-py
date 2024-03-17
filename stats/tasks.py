@@ -2,11 +2,12 @@ import zoneinfo
 from datetime import date, datetime, timezone, timedelta
 
 from celery import chain, group, shared_task
+from django.core.exceptions import ObjectDoesNotExist
 
 import nhlapi.game
 import nhlapi.league
 import nhlapi.schedule
-from stats.models import Franchise, Season, Team, Game, Shot, Faceoff
+from stats.models import Franchise, Season, Team, Game, Shot, Faceoff, Shift
 
 
 def _eastern_iso_to_utc(value: str) -> datetime | None:
@@ -75,8 +76,10 @@ def load_seasons():
     seasons_resp = nhlapi.league.get_seasons()
     seasons = []
     for s in seasons_resp["data"]:
-        season = Season()
-        season.id = s["id"]
+        try:
+            season = Season.objects.get(id=s["id"])
+        except ObjectDoesNotExist:
+            season = Season(id=s["id"])
         season.formatted_season_id = s["formattedSeasonId"]
         season.start_date = _eastern_iso_to_utc(s["startDate"])
         season.end_date = _eastern_iso_to_utc(s["endDate"])
@@ -110,26 +113,27 @@ def load_season_games(season_id: int):
 @shared_task
 def load_weeks_games(day: date):
     schedule = nhlapi.schedule.get_week_schedule(day)
-    games = []
     for d in schedule["gameWeek"]:
         for g in d["games"]:
-            game = Game()
-            game.id = g["id"]
-            game.season = Season.objects.get(id=g["season"])
-            game.game_type = g["gameType"]
-            game.start_time = g["startTimeUTC"]
-            try:
-                game.away_team = Team.objects.get(id=g["awayTeam"]["id"])
-            except Team.DoesNotExist:
-                print(g)
-            try:
-                game.home_team = Team.objects.get(id=g["homeTeam"]["id"])
-            except Team.DoesNotExist:
-                print(g)
-            games.append(game)
-    Game.objects.bulk_create(games, ignore_conflicts=True)
+            if g["gameType"] == 2 or g["gameType"] == 3:
+                try:
+                    game = Game.objects.get(id=g["id"])
+                except ObjectDoesNotExist:
+                    game = Game(id=g["id"])
 
-    print(games)
+                game.id = g["id"]
+                game.season = Season.objects.get(id=g["season"])
+                game.game_type = g["gameType"]
+                game.start_time = g["startTimeUTC"]
+                try:
+                    game.away_team = Team.objects.get(id=g["awayTeam"]["id"])
+                except Team.DoesNotExist:
+                    print(g)
+                try:
+                    game.home_team = Team.objects.get(id=g["homeTeam"]["id"])
+                except Team.DoesNotExist:
+                    print(g)
+                game.save()
 
 
 @shared_task
@@ -137,13 +141,14 @@ def load_games_play_by_play(game_id: str):
     pbp_resp = nhlapi.game.get_game_play_by_play(game_id)
 
     for p in pbp_resp['plays']:
-        print(p)
+        # print(p)
         event = None
 
         if p["typeCode"] in nhlapi.game.shot_type_mapping:
-            event = Shot()
-            if Shot.objects.filter(game_id=game_id, event_id=p["eventId"]).exists():
+            try:
                 event = Shot.objects.get(game_id=game_id, event_id=p["eventId"])
+            except ObjectDoesNotExist:
+                event = Shot(game_id=game_id, event_id=p["eventId"])
             event.result = nhlapi.game.shot_type_mapping[p["typeCode"]]
             if event.result == "GOAL":
                 event.shooter = p["details"]["scoringPlayerId"]
@@ -154,9 +159,10 @@ def load_games_play_by_play(game_id: str):
             if "blockingPlayerId" in p["details"]:
                 event.blocking_player = p["details"]["blockingPlayerId"]
         elif p["typeCode"] == 502:
-            event = Faceoff()
-            if Faceoff.objects.filter(game_id=game_id, event_id=p["eventId"]).exists():
+            try:
                 event = Faceoff.objects.get(game_id=game_id, event_id=p["eventId"])
+            except ObjectDoesNotExist:
+                event = Faceoff(game_id=game_id, event_id=p["eventId"])
             event.winner = p["details"]["winningPlayerId"]
             event.loser = p["details"]["losingPlayerId"]
 
@@ -167,3 +173,26 @@ def load_games_play_by_play(game_id: str):
             event.time_elapsed = _scoreboard_time_to_seconds(p["timeInPeriod"])
             event.time_remaining = _scoreboard_time_to_seconds(p["timeRemaining"])
             event.save()
+
+
+@shared_task
+def load_games_shifts(game_id: str):
+    shifts_resp = nhlapi.game.get_game_shifts(game_id)
+
+    for s in shifts_resp["data"]:
+        try:
+            shift = Shift.objects.get(game_id=game_id, shift_id=s["id"])
+        except ObjectDoesNotExist:
+            shift = Shift(game_id=game_id, shift_id=s["id"])
+        shift.game_id = game_id
+        shift.shift_id = s["id"]
+        shift.player_id = s["playerId"]
+        shift.team_id = s["teamId"]
+        shift.period = s["period"]
+        shift.start_time = _scoreboard_time_to_seconds(s["startTime"])
+        shift.end_time = _scoreboard_time_to_seconds(s["endTime"])
+        if "duration" in s and s["duration"] is not None:
+            shift.duration = _scoreboard_time_to_seconds(s["duration"])
+        else:
+            shift.duration = 0
+        shift.save()
