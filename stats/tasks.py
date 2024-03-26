@@ -4,9 +4,9 @@ from datetime import date, datetime, timezone, timedelta
 from celery import chain, group, shared_task
 from django.core.exceptions import ObjectDoesNotExist
 
-import nhlapi.game
-import nhlapi.league
-import nhlapi.schedule
+from warehouse import nhlapi
+import warehouse.nhlapi.league
+import warehouse.nhlapi.schedule
 from stats.models import Franchise, Season, Team, Game, Shot, Faceoff, Shift
 
 
@@ -20,6 +20,8 @@ def _eastern_iso_to_utc(value: str) -> datetime | None:
 
 
 def _scoreboard_time_to_seconds(scoreboard_time: str) -> int:
+    if len(scoreboard_time) == 0:
+        return 0
     (minutes, seconds) = tuple(scoreboard_time.split(":"))
     return int(minutes) * 60 + int(seconds)
 
@@ -40,7 +42,7 @@ def preload():
 
 @shared_task
 def load_franchises():
-    franchises_resp = nhlapi.league.get_franchises()
+    franchises_resp = warehouse.nhlapi.league.get_franchises()
     franchises = []
     for f in franchises_resp["data"]:
         franchise = Franchise()
@@ -56,7 +58,7 @@ def load_franchises():
 
 @shared_task
 def load_teams():
-    teams_resp = nhlapi.league.get_teams()
+    teams_resp = warehouse.nhlapi.league.get_teams()
     teams = []
     for t in teams_resp["data"]:
         team = Team()
@@ -73,7 +75,7 @@ def load_teams():
 
 @shared_task
 def load_seasons():
-    seasons_resp = nhlapi.league.get_seasons()
+    seasons_resp = warehouse.nhlapi.league.get_seasons()
     seasons = []
     for s in seasons_resp["data"]:
         try:
@@ -112,7 +114,7 @@ def load_season_games(season_id: int):
 
 @shared_task
 def load_weeks_games(day: date):
-    schedule = nhlapi.schedule.get_week_schedule(day)
+    schedule = warehouse.nhlapi.schedule.get_week_schedule(day)
     for d in schedule["gameWeek"]:
         for g in d["games"]:
             if g["gameType"] == 2 or g["gameType"] == 3:
@@ -137,19 +139,26 @@ def load_weeks_games(day: date):
 
 
 @shared_task
-def load_games_play_by_play(game_id: str):
-    pbp_resp = nhlapi.game.get_game_play_by_play(game_id)
+def backfill_season_game_events(season_id: int):
+    for game in Game.objects.filter(season=season_id).all():
+        load_games_play_by_play.s(game.id).apply_async()
+        load_games_shifts.s(game.id).apply_async()
+
+
+@shared_task
+def load_games_play_by_play(game_id: int):
+    pbp_resp = warehouse.nhlapi.game.get_game_play_by_play(game_id)
 
     for p in pbp_resp['plays']:
         # print(p)
         event = None
 
-        if p["typeCode"] in nhlapi.game.shot_type_mapping:
+        if p["typeCode"] in warehouse.nhlapi.game.shot_type_mapping:
             try:
                 event = Shot.objects.get(game_id=game_id, event_id=p["eventId"])
             except ObjectDoesNotExist:
                 event = Shot(game_id=game_id, event_id=p["eventId"])
-            event.result = nhlapi.game.shot_type_mapping[p["typeCode"]]
+            event.result = warehouse.nhlapi.game.shot_type_mapping[p["typeCode"]]
             if event.result == "GOAL":
                 event.shooter = p["details"]["scoringPlayerId"]
             else:
@@ -176,17 +185,18 @@ def load_games_play_by_play(game_id: str):
 
 
 @shared_task
-def load_games_shifts(game_id: str):
-    shifts_resp = nhlapi.game.get_game_shifts(game_id)
+def load_games_shifts(game_id: int):
+    shifts_resp = warehouse.nhlapi.game.get_game_shifts(game_id)
 
     for s in shifts_resp["data"]:
         try:
             shift = Shift.objects.get(game_id=game_id, shift_id=s["id"])
         except ObjectDoesNotExist:
             shift = Shift(game_id=game_id, shift_id=s["id"])
-        shift.game_id = game_id
-        shift.shift_id = s["id"]
         shift.player_id = s["playerId"]
+        if not shift.player_id:
+            print(s)
+            continue
         shift.team_id = s["teamId"]
         shift.period = s["period"]
         shift.start_time = _scoreboard_time_to_seconds(s["startTime"])

@@ -19,9 +19,9 @@ dependencies = [
 
 [tool.setuptools]
 packages = [
-    "nhlapi",
     "pucksmart",
     "stats",
+    "warehouse",
 ]
 
 [project.optional-dependencies]

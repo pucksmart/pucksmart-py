@@ -40,6 +40,7 @@ INSTALLED_APPS = [
     "rest_framework",
     "django_celery_results",
     "stats.apps.StatsConfig",
+    "warehouse.apps.WarehouseConfig"
 ]
 
 MIDDLEWARE = [
@@ -130,6 +131,5 @@ STATIC_URL = "static/"
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
 
-CELERY_BROKER_URL = "redis://localhost:6379/0"
-CELERY_BACKEND_URL = "redis://localhost:6379"
+CELERY_BROKER_URL = "amqp://pucksmart:pucksmart@localhost:5672/pucksmart"
 CELERY_RESULT_BACKEND = "django-db"
