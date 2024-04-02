@@ -1,7 +1,6 @@
 from django.contrib import admin
 
-from stats.models import Franchise, Team, Game
-
+from stats.models import Franchise, Game, Team
 
 # Register your models here.
 
