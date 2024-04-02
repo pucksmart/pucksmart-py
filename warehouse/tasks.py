@@ -9,6 +9,7 @@ import pandas as pd
 from botocore.config import Config
 from celery import shared_task
 
+from stats.models import Game
 from warehouse.models import HttpSource, NhlPlayer
 
 s3 = boto3.resource("s3",
@@ -129,11 +130,22 @@ def load_player(nhl_id: int):
     if "birthStateProvince" in player_summary:
         player.birth_region = player_summary["birthStateProvince"]["default"]
     player.birth_country = player_summary["birthCountry"]
-    player.handedness = player_summary["shootsCatches"]
-    player.height = player_summary["heightInCentimeters"]
-    player.weight = player_summary["weightInKilograms"]
+    if "shootsCatches" in player_summary:
+        player.handedness = player_summary["shootsCatches"]
+    if "heightInCentimeters" in player_summary:
+        player.height = player_summary["heightInCentimeters"]
+    if "weightInKilograms" in player_summary:
+        player.weight = player_summary["weightInKilograms"]
 
     player.save()
+
+
+@shared_task
+def backfill_game_reports():
+    for g in Game.objects.all():
+        load_boxscore.s(g.id).apply_async()
+        load_play_by_play.s(g.id).apply_async()
+        load_shifts.s(g.id).apply_async()
 
 
 @shared_task

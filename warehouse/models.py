@@ -22,6 +22,6 @@ class NhlPlayer(models.Model):
     birth_locality = models.CharField(max_length=64)
     birth_region = models.CharField(max_length=64, null=True, blank=True)
     birth_country = models.CharField(max_length=3)
-    handedness = models.CharField(max_length=1)
+    handedness = models.CharField(max_length=1, null=True, blank=True)
     height = models.IntegerField(null=True, blank=True)
     weight = models.IntegerField(null=True, blank=True)
