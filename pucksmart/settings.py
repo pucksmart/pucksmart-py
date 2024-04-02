@@ -40,7 +40,7 @@ INSTALLED_APPS = [
     "rest_framework",
     "django_celery_results",
     "stats.apps.StatsConfig",
-    "warehouse.apps.WarehouseConfig"
+    "warehouse.apps.WarehouseConfig",
 ]
 
 MIDDLEWARE = [

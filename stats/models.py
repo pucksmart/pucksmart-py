@@ -14,7 +14,9 @@ class Team(models.Model):
     id = models.IntegerField(primary_key=True)
     name = models.CharField(max_length=64)
     abbreviation = models.CharField(max_length=3)
-    franchise = models.ForeignKey(Franchise, on_delete=models.DO_NOTHING, null=True, blank=True)
+    franchise = models.ForeignKey(
+        Franchise, on_delete=models.DO_NOTHING, null=True, blank=True
+    )
 
 
 class Season(models.Model):

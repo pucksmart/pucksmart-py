@@ -1,13 +1,13 @@
 import zoneinfo
-from datetime import date, datetime, timezone, timedelta
+from datetime import date, datetime, timedelta, timezone
 
 from celery import chain, group, shared_task
 from django.core.exceptions import ObjectDoesNotExist
 
-from warehouse import nhlapi
 import warehouse.nhlapi.league
 import warehouse.nhlapi.schedule
-from stats.models import Franchise, Season, Team, Game, Shot, Faceoff, Shift
+from stats.models import Faceoff, Franchise, Game, Season, Shift, Shot, Team
+from warehouse import nhlapi
 
 
 def _eastern_iso_to_utc(value: str) -> datetime | None:
@@ -36,7 +36,7 @@ def preload():
                 load_teams.signature(args=(), immutable=True),
             ).apply_async(),
         ),
-        load_games.apply_async()
+        load_games.apply_async(),
     )
 
 
@@ -149,7 +149,7 @@ def backfill_season_game_events(season_id: int):
 def load_games_play_by_play(game_id: int):
     pbp_resp = warehouse.nhlapi.game.get_game_play_by_play(game_id)
 
-    for p in pbp_resp['plays']:
+    for p in pbp_resp["plays"]:
         # print(p)
         event = None
 

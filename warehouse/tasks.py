@@ -1,24 +1,26 @@
-from datetime import timezone, timedelta, datetime
+from datetime import datetime, timedelta, timezone
 from io import StringIO
 from itertools import product
 from string import ascii_lowercase
 
 import boto3
-import requests
 import pandas as pd
+import requests
 from botocore.config import Config
 from celery import shared_task
 
 from stats.models import Game
 from warehouse.models import HttpSource, NhlPlayer
 
-s3 = boto3.resource("s3",
-                    endpoint_url="http://localhost:9000",
-                    config=Config(signature_version="s3v4"),
-                    aws_access_key_id="accesskey",
-                    aws_secret_access_key="secretkey",
-                    aws_session_token=None,
-                    verify=False)
+s3 = boto3.resource(
+    "s3",
+    endpoint_url="http://localhost:9000",
+    config=Config(signature_version="s3v4"),
+    aws_access_key_id="accesskey",
+    aws_secret_access_key="secretkey",
+    aws_session_token=None,
+    verify=False,
+)
 
 
 @shared_task
@@ -29,7 +31,9 @@ def load_play_by_play(game_id: int):
     except HttpSource.DoesNotExist:
         source = HttpSource(url=url)
 
-    if not source.last_refreshed or source.last_refreshed + timedelta(days=1) < datetime.now(timezone.utc):
+    if not source.last_refreshed or source.last_refreshed + timedelta(
+        days=1
+    ) < datetime.now(timezone.utc):
         e_tag = ""
         if source.e_tag:
             r = requests.head(source.url, allow_redirects=True)
@@ -45,13 +49,17 @@ def load_play_by_play(game_id: int):
 
 @shared_task
 def load_shifts(game_id: int):
-    url = "https://api.nhle.com/stats/rest/en/shiftcharts?cayenneExp=gameId=%d" % game_id
+    url = (
+        "https://api.nhle.com/stats/rest/en/shiftcharts?cayenneExp=gameId=%d" % game_id
+    )
     try:
         source = HttpSource.objects.get(url=url)
     except HttpSource.DoesNotExist:
         source = HttpSource(url=url)
 
-    if not source.last_refreshed or source.last_refreshed + timedelta(days=1) < datetime.now(timezone.utc):
+    if not source.last_refreshed or source.last_refreshed + timedelta(
+        days=1
+    ) < datetime.now(timezone.utc):
         e_tag = ""
         if source.e_tag:
             r = requests.head(source.url, allow_redirects=True)
@@ -94,7 +102,9 @@ def load_boxscore(game_id: int):
     except HttpSource.DoesNotExist:
         source = HttpSource(url=url)
 
-    if not source.last_refreshed or source.last_refreshed + timedelta(days=1) < datetime.now(timezone.utc):
+    if not source.last_refreshed or source.last_refreshed + timedelta(
+        days=1
+    ) < datetime.now(timezone.utc):
         e_tag = ""
         if source.e_tag:
             r = requests.head(source.url, allow_redirects=True)
@@ -153,7 +163,10 @@ def load_players():
     search_terms = map("".join, product(ascii_lowercase, repeat=3))
     players = []
     for search_term in search_terms:
-        url = "https://search.d3.nhle.com/api/v1/search/player?culture=en-us&limit=1000&q=" + search_term
+        url = (
+            "https://search.d3.nhle.com/api/v1/search/player?culture=en-us&limit=1000&q="
+            + search_term
+        )
         r = requests.get(url)
         print(search_term)
         players = players + r.json()
