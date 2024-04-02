@@ -129,7 +129,13 @@ def load_player(nhl_id: int):
     except NhlPlayer.DoesNotExist:
         player = NhlPlayer(nhl_id=nhl_id)
 
-    player_summary = requests.get(url, allow_redirects=True).json()
+    r = requests.get(url, allow_redirects=True)
+    try:
+        player_summary = r.json()
+    except requests.exceptions.InvalidJSONError:
+        print("Invalid JSON for player", nhl_id)
+        print(r.content)
+        return
     player.given_name = player_summary["firstName"]["default"]
     player.family_name = player_summary["lastName"]["default"]
     player.is_active = player_summary["isActive"]
